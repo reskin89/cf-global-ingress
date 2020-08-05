@@ -1,0 +1,7 @@
+namespace: istio-system
+resources:
+- secret.yml
+- serviceaccount.yml
+- role.yml
+- rolebinding.yml
+- deployment.yml

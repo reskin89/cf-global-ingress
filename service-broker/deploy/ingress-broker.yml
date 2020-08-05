@@ -1,0 +1,99 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-broker
+  labels:
+    app: ingress-broker
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ingress-broker
+  labels:
+    app: ingress-broker
+rules:
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - virtualservices
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ingress-broker
+  labels:
+    app: ingress-broker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ingress-broker
+subjects:
+- kind: ServiceAccount
+  name: ingress-broker
+  namespace: istio-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-broker
+  labels:
+    app: ingress-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingress-broker
+  template:
+    metadata:
+      labels:
+        app: ingress-broker
+    spec:
+      serviceAccountName: ingress-broker
+      containers:
+      - name: ingress-broker
+        image: hub.docker.com/MYDOCKERHUB/ingress-broker
+        imagePullPolicy: Always
+        env:
+        - name: NAMESPACE
+          value: istio-system
+        - name: TLD
+          value: cluster.local
+        resources:
+          requests: {memory: 128Mi, cpu: 50m}
+          limits: {memory: 256Mi, cpu: 100m}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-broker
+  labels:
+    app: ingress-broker
+spec:
+  ports:
+  - port: 8080
+  selector:
+    app: ingress-broker
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-broker
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  labels:
+    app: ingress-broker
+spec:
+  rules:
+  - host: ingress-broker.MYDOMAIN.net
+    http:
+      paths:
+      - backend:
+          serviceName: ingress-broker
+          servicePort: 8080
+  tls:
+  - hosts:
+    - ingress-broker.apps.MYDOMAIN.net
+    secretName: ingress-broker-tls

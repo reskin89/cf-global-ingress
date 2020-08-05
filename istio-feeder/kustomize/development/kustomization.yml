@@ -1,0 +1,7 @@
+images:
+- name: hub.docker.com/MYDOCKERSPACE/ingress-feeder
+  newTag: dev
+bases:
+- ../base
+patchesStrategicMerge:
+- deployment.yml

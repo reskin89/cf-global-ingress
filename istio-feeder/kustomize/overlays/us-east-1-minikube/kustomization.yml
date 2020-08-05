@@ -1,0 +1,3 @@
+nameSuffix: -us-east-1
+bases:
+- ../../development

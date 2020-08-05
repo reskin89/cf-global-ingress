@@ -1,0 +1,32 @@
+{
+  "name": "istio-feeder",
+  "version": "1.0.0",
+  "description": "Cloud Foundry Global Ingress Isio Feeder",
+  "main": "feeder.js",
+  "author": "Comcast",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node_modules/.bin/mocha",
+    "start": "node feeder.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Comcast/cf-global-ingress"
+  },
+  "engines": {
+    "node": "14.x",
+    "npm": "6.x"
+  },
+  "dependencies": {
+    "axios": "^0.19.2",
+    "fs": "0.0.1-security",
+    "https": "^1.0.0",
+    "nats": "^1.4.9",
+    "sequential-task-queue": "^1.2.1"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^8.0.1",
+    "mock-fs": "^4.12.0"
+  }
+}
