@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const k8scn = require('@kubernetes/client-node');
+const { getMaxListeners } = require('./logging');
 
 const port = process.env.PORT || 8080;
 const tld = process.env.TLD || 'cluster.local'
@@ -39,9 +40,9 @@ function getVirtualService(instance_id) {
 }
 
 function getVirtualServiceByName(name) {
-  return k8sApiExtV1.getNamespacedCustomObject(
+  return Promise.resolve(k8sApiExtV1.getNamespacedCustomObject(
     'networking.istio.io', 'v1beta1', ns, 'virtualservices', name
-  );
+  ));
 }
 
 function patchVirtualService(name, body) {
@@ -50,6 +51,26 @@ function patchVirtualService(name, body) {
     'networking.istio.io', 'v1beta1', ns, 'virtualservices', name, body,
     undefined, undefined, undefined, options
   )
+}
+
+function patchIngressService(body) {
+  const options = {headers: {'content-type': 'application/json-patch+json'}};
+  return k8sApiExtV1.patchNamespacedCustomObject(
+    'networking.istio.io', 'v1alpha3', ns, 'gateways', 'mygateway', body,
+    undefined, undefined, undefined, options
+  )
+}
+
+function getIngressServices() {
+  return k8sApiExtV1.getNamespacedCustomObject(
+    'networking.istio.io', 'v1alpha3', ns, 'gateways', 'mygateway'
+  );
+}
+
+function getIngressServiceByName(name) {
+  return k8sApiExtV1.getNamespacedCustomObject(
+    'networking.istio.io', 'v1alpha3', ns, 'gateways', 'mygateway'
+  );
 }
 
 // Get Catalog
@@ -119,6 +140,39 @@ app.put('/v2/service_instances/:instance_id', (req, res) => {
       }
     })
     .then(() => {
+      return getIngressServices()
+    })
+    .then((is) => {
+      const exists = is.body.spec.servers.find(({ port }) => port.name === req.body.parameters.fqdn)
+
+      if ( typeof exists !== 'undefined') {
+        return
+      } else {
+        return patchIngressService(
+          [
+            {
+              op: 'add', 
+              path: '/spec/servers/-', 
+              value: {
+                port: {
+                  number: 443,
+                  name: req.body.parameters.fqdn,
+                  protocol: "HTTPS"
+                },
+                hosts: [
+                  req.body.parameters.fqdn
+                ],
+                tls: {
+                  credentialName: "defaultSSLCertificate",
+                  mode: "SIMPLE"
+                }
+              }
+            }
+          ]
+       )
+      }
+    })
+    .then(() => {
       res.status(201).send({});
     })
     .catch((err) => {
@@ -158,6 +212,23 @@ app.delete('/v2/service_instances/:instance_id', (req, res) => {
           {op: 'remove', path: `/metadata/annotations/service-instance.cf-global-ingress.tld~1${req.params.instance_id}`}
         ])
       }
+    })
+    .then((resp) => {
+      if (!resp.body.hasOwnProperty('details')){
+        return
+      }
+      let services = getIngressServices().then((result) => { return result }).catch((err) => { console.log("***INGRESS SERVICE ERRROR:", err) } )
+      let serverArray = services.then((res) => { return res })
+      let virtualServices = getVirtualServiceByName("foo.tld").then((res) => { return res }).catch((err) => { 
+        serverArray.then((theData) => {
+          theData.body.spec.servers.forEach((server, index) => {
+            if (server.port.name === resp.body.details.name) {
+              return patchIngressService([{op: 'remove', path: `/spec/servers/${index}`}])
+            }
+          })
+        })
+       })
+      return
     })
     .then(() => {
       res.status(200).send({})

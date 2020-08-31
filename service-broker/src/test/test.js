@@ -18,6 +18,12 @@ function getVirtualService() {
   )
 }
 
+function getIngressServices() {
+  return k8sApiExtV1.getNamespacedCustomObject(
+    'networking.istio.io', 'v1alpha3', 'default', 'gateways', 'mygateway'
+  );
+}
+
 describe('GET catalog', () => {
   it('should response with 200 and provide a json body containing a list of services', (done) => {
     chai.request(app)
@@ -86,6 +92,21 @@ describe('Multiple services share hostname "foo.tld"', () => {
           done();
         }).catch((err) => {done(err);})
       });
+
+    describe('Istio Ingress Services', () => {
+      let is;
+      before(() => {is=getIngressServices();});
+
+      it('should return services in the ingress gateway, with the new domain added', (done) => {
+        is.then((is) => {
+          expect(is.body.spec.servers)
+            .to.have.lengthOf(3);
+          expect(is.body.spec.servers[2])
+            .to.be.an('object');
+          done();
+        }).catch((err) => {done(err);})
+      })
+    });
 
     });
   })
@@ -234,7 +255,6 @@ describe('Multiple services share hostname "foo.tld"', () => {
         });
     });
   });
-
 });
 
 
@@ -325,7 +345,7 @@ describe('Flow', () => {
           .catch((err) => {
             done(err);
           })
-      });
+      }); 
     });
   });
 
@@ -624,6 +644,19 @@ describe('Flow', () => {
           expect(err.statusCode).to.be.equal(404);
           done();
         });
+    });
+  });
+});
+
+describe('Ingress Gateway', () => {
+  describe('Ingress Gateway Server Objects', () => {
+    it('should no longer have foo.tld in the server definitions', (done) => {
+      getIngressServices()
+        .then((is) => {
+          expect(is.body.spec.servers)
+            .to.have.lengthOf(2);
+          done();
+        }).catch((err) => {done(err);})
     });
   });
 });
